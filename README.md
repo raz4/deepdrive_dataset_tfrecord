@@ -5,6 +5,11 @@ This repository shall help to create a tfrecord file for the berkeley deep drive
 
 **Now also supports the new data format**
 
+This fork adds support for the following:
+  * BDD Detection 2020 Labels
+  * Tensorflow 2
+  * Python 3.7+
+
 ## Download dataset
 
 1. Register at http://bdd-data.berkeley.edu/login.html . NOTE: The server does not serve an SSL ceritificate.
@@ -31,6 +36,8 @@ You can use the script create_tfrecord.py in order to create the TFRecord file y
 --scene_type = str : Specify the scene_type which should be written to the tfrecord
 
 --daytime = str : Restrict the daytime which should be written to the tfrecord
+
+--input_path = str : Override "~/.deepdrive" directory with custom directory; must contain "download" folder as described above
 
 The resulting TFRecord files can be found in :
 ~/.deepdrive/tfrecord/\[version\]/\[fold_type\]/
