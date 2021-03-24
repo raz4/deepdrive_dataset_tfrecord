@@ -9,10 +9,10 @@ import datetime
 import tensorflow as tf
 import numpy as np
 
-from utils import mkdir_p
-from deepdrive_dataset_download import DeepdriveDatasetDownload
-from deepdrive_versions import DEEPDRIVE_LABELS
-from tf_features import *
+from .utils import mkdir_p
+from .deepdrive_dataset_download import DeepdriveDatasetDownload
+from .deepdrive_versions import DEEPDRIVE_LABELS
+from .tf_features import *
 from PIL import Image
 
 
@@ -67,8 +67,11 @@ class DeepdriveDatasetWriter(object):
             obj['image/object/class/label/name'] = tf.VarLenFeature(tf.string)
         return obj
 
-    def __init__(self):
-        self.input_path = os.path.join(expanduser('~'), '.deepdrive')
+    def __init__(self, input_path=None):
+        if input_path:
+            self.input_path = input_path
+        else:
+            self.input_path = os.path.join(expanduser('~'), '.deepdrive')
 
     def unzip_file_to_folder(self, filename, folder, remove_file_after_creating=True):
         assert (os.path.exists(filename) and os.path.isfile(filename))
@@ -99,7 +102,13 @@ class DeepdriveDatasetWriter(object):
         if not os.path.exists(expansion_labels_folder):
             mkdir_p(expansion_labels_folder)
 
-        full_labels_path = os.path.join(expansion_labels_folder, 'bdd100k', 'labels', '100k')
+        labels_2020 = False
+        if os.path.exists(os.path.join(expansion_labels_folder, 'bdd100k', 'labels', 'detection20')):
+            labels_2020 = True
+            full_labels_path = os.path.join(expansion_labels_folder, 'bdd100k', 'labels', 'detection20')
+        else:
+            full_labels_path = os.path.join(expansion_labels_folder, 'bdd100k', 'labels', '100k')
+
         full_images_path = os.path.join(expansion_images_folder, 'bdd100k', 'images')
         if version in [None, '100k']:
             full_images_path = os.path.join(full_images_path, '100k', fold_type)
@@ -108,15 +117,15 @@ class DeepdriveDatasetWriter(object):
 
         extract_files = True
 
-        valid_folder_structure_old_format = (len(DeepdriveDatasetDownload.filter_folders(full_labels_path)) == 2 and \
+        valid_folder_structure_old_format = (len(DeepdriveDatasetDownload.filter_folders(full_labels_path)) >= 2 and \
                                              len(DeepdriveDatasetDownload.filter_files(full_images_path)) > 0)
 
-        valid_folder_structure_new_format = (len(DeepdriveDatasetDownload.filter_files(full_labels_path)) == 2 and \
+        valid_folder_structure_new_format = (len(DeepdriveDatasetDownload.filter_files(full_labels_path)) >= 2 and \
                                              len(DeepdriveDatasetDownload.filter_files(full_images_path)) > 0)
 
         if valid_folder_structure_old_format or valid_folder_structure_new_format:
             print('Do not check the download folder. Pictures seem to exist.')
-            if fold_type != 'test' and valid_folder_structure_new_format:
+            if fold_type != 'test' and valid_folder_structure_new_format and not labels_2020:
                 full_labels_path = os.path.join(full_labels_path, fold_type)
 
             extract_files = False
@@ -131,25 +140,34 @@ class DeepdriveDatasetWriter(object):
             raise BaseException('Download folder: {0} did not exist. It had been created. '
                                 'Please put images, labels there.'.format(download_folder))
 
-        if valid_folder_structure_new_format:
+        if valid_folder_structure_new_format and not labels_2020:
             full_labels_path = os.path.join(full_labels_path, '..')
 
         # unzip the elements
         if extract_files:
             print('Starting to unzip the files. This might not work for the new dataformat')
-            # TODO: update for new data format
-            self.unzip_file_to_folder(
-                os.path.join(
-                    download_folder, 'bdd100k_labels.zip'
-                ),
-                expansion_labels_folder, False)
+            if os.path.exists(os.path.join(download_folder, 'bdd100k_labels_detection20.zip')):
+                labels_2020 = True
+                valid_folder_structure_new_format = True
+                self.unzip_file_to_folder(
+                    os.path.join(
+                        download_folder, 'bdd100k_labels_detection20.zip'
+                    ),
+                    expansion_labels_folder, False)
+            else:
+                # TODO: update for new data format
+                self.unzip_file_to_folder(
+                    os.path.join(
+                        download_folder, 'bdd100k_labels.zip'
+                    ),
+                    expansion_labels_folder, False)
             self.unzip_file_to_folder(
                 os.path.join(download_folder, 'bdd100k_images.zip'),
                 expansion_images_folder, False)
 
         if fold_type == 'test':
             return full_images_path, None, True
-        return full_images_path, full_labels_path, valid_folder_structure_new_format
+        return full_images_path, full_labels_path, valid_folder_structure_new_format, labels_2020
 
     def filter_boxes_from_annotation(self, annotations):
         """
@@ -231,7 +249,7 @@ class DeepdriveDatasetWriter(object):
         im = Image.open(image_path)
         image_width, image_height = im.size
         image_filename = os.path.basename(image_path)
-        image_fileid = re.search('^(.*)(\.jpg)$', image_filename).group(1)
+        image_fileid = re.search('^(.*)(\.jpg)$', image_filename).group(1).encode()
 
         tmp_feat_dict = DeepdriveDatasetWriter.feature_dict
         tmp_feat_dict['image/id'] = bytes_feature(image_fileid)
@@ -240,8 +258,8 @@ class DeepdriveDatasetWriter(object):
         tmp_feat_dict['image/width'] = int64_feature(image_width)
         with open(image_path, 'rb') as f:
             tmp_feat_dict['image/encoded'] = bytes_feature(f.read())
-        tmp_feat_dict['image/format'] = bytes_feature(image_format)
-        tmp_feat_dict['image/filename'] = bytes_feature(image_filename)
+        tmp_feat_dict['image/format'] = bytes_feature(image_format.encode())
+        tmp_feat_dict['image/filename'] = bytes_feature(image_filename.encode())
         tmp_feat_dict['image/object/bbox/id'] = int64_feature(boxid)
         tmp_feat_dict['image/object/bbox/xmin'] = float_feature(xmin)
         tmp_feat_dict['image/object/bbox/xmax'] = float_feature(xmax)
@@ -356,12 +374,17 @@ class DeepdriveDatasetWriter(object):
         if not os.path.exists(output_path):
             mkdir_p(output_path)
 
-        full_images_path, full_labels_path, new_format = self.get_image_label_folder(fold_type, version)
+        full_images_path, full_labels_path, new_format, labels_2020 = self.get_image_label_folder(fold_type, version)
 
         obj_annotation_dict = dict()
         if new_format and fold_type != 'test':
-            label_file = os.path.join(
+            if not labels_2020:
+                label_file = os.path.join(
                 full_labels_path, 'bdd100k_labels_images_{0}.json'.format(
+                    fold_type))
+            else:
+                label_file = os.path.join(
+                full_labels_path, 'det_v2_{0}_release.json'.format(
                     fold_type))
             try:
                 obj_annotation_dict = DeepdriveDatasetWriter. \
@@ -392,8 +415,8 @@ class DeepdriveDatasetWriter(object):
             scene_type, daytime_type, classes
         )
         write_counter = 0
-        with tf.Session() as sess:
-            sess.run(tf.global_variables_initializer())
+        with tf.compat.v1.Session() as sess:
+            sess.run(tf.compat.v1.global_variables_initializer())
             for file_counter, f in enumerate(image_files):
                 if write_counter % max_elements_per_file == 0:
                     if writer is not None and write_counter != 0:
@@ -403,7 +426,7 @@ class DeepdriveDatasetWriter(object):
                     logger.info('{0}: Create TFRecord filename: {1} after processing {2}/{3} files'.format(
                         str(datetime.datetime.now()), tmp_filename_tfrecord, file_counter, len(image_files)
                     ))
-                    writer = tf.python_io.TFRecordWriter(tmp_filename_tfrecord)
+                    writer = tf.compat.v1.python_io.TFRecordWriter(tmp_filename_tfrecord)
                 elif write_counter % 250 == 0:
                     logger.info('\t{0}: Processed file: {1}/{2}'.format(
                         str(datetime.datetime.now()), file_counter, len(image_files)))
@@ -424,6 +447,10 @@ class DeepdriveDatasetWriter(object):
 
                 if picture_id_annotations is None:
                     continue
+
+                if picture_id_annotations['labels'] is None:
+                    continue
+
                 attributes = picture_id_annotations.get('attributes', None)
 
                 if weather_type is not None and \

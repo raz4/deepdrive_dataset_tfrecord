@@ -1,4 +1,4 @@
 matplotlib
-tensorflow-gpu
+tensorflow>=2
 numpy
 Pillow
