@@ -3,10 +3,10 @@ import random
 import re
 from os.path import expanduser
 
-from deepdrive_dataset_writer import DeepdriveDatasetWriter, DeepdriveDatasetDownload
-from scope_wrapper import scope_wrapper
-from tf_features import *
-from utils import mkdir_p
+from .deepdrive_dataset_writer import DeepdriveDatasetWriter, DeepdriveDatasetDownload
+from .scope_wrapper import scope_wrapper
+from .tf_features import *
+from .utils import mkdir_p
 
 
 @scope_wrapper

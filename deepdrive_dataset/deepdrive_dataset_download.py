@@ -3,7 +3,7 @@ import re
 import zipfile
 from os.path import expanduser
 
-from utils import mkdir_p
+from .utils import mkdir_p
 
 
 class DeepdriveDatasetDownload(object):
@@ -18,7 +18,7 @@ class DeepdriveDatasetDownload(object):
         :param regex:
         :return:
         """
-        assert (regex is None or isinstance(regex, re._pattern_type))
+        assert (regex is None or isinstance(regex, re.Pattern))
         filtered = []
         try:
             list_dir = os.listdir(path)
