@@ -11,6 +11,7 @@ if __name__ == '__main__':
                         default='train', choices=DEEPDRIVE_FOLDS)
     parser.add_argument('--version', type=str,
                         default='100k', choices=DEEPDRIVE_VERSIONS)
+    parser.add_argument('--input_path', type=str, default=None)
     parser.add_argument(
         '--elements_per_tfrecord', type=int, default=1000,
         help='Number of Pictures per tfrecord file. '
@@ -31,7 +32,6 @@ if __name__ == '__main__':
         '--daytime', type=str, default=None,
         help='Only write files with this specific daytime'
     )
-
     parser.add_argument(
         '--classes', type=str, default=None,
         help='Only write boundingboxes of this specific classes '
@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
 
-    dd = DeepdriveDatasetWriter()
+    dd = DeepdriveDatasetWriter(FLAGS.input_path)
     dd.write_tfrecord(
         FLAGS.fold_type, version=FLAGS.version,
         max_elements_per_file=FLAGS.elements_per_tfrecord,
